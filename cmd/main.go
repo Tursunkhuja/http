@@ -3,9 +3,11 @@ package main
 import (
 	"log"
 	"net"
+	"net/http"
 	"os"
 
-	"github.com/Tursunkhuja/http/pkg/server"
+	"github.com/Tursunkhuja/http/cmd/app"
+	"github.com/Tursunkhuja/http/pkg/banners"
 )
 
 func main() {
@@ -19,12 +21,16 @@ func main() {
 
 func execute(host string, port string) (err error) {
 
-	srv := server.NewServer(net.JoinHostPort(host, port))
+	mux := http.NewServeMux()
+	bannersSvc := banners.NewService()
 
-	srv.Register("/payments", func(req *server.Request) {
+	server := app.NewServer(mux, bannersSvc)
+	server.Init()
 
-		id := req.QueryParams["id"]
-		log.Print(id)
-	})
-	return srv.Start()
+	srv := &http.Server{
+		Addr:    net.JoinHostPort(host, port),
+		Handler: server,
+	}
+	log.Print("server start " + host + ":" + port)
+	return srv.ListenAndServe()
 }
