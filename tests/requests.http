@@ -1,7 +1,0 @@
-###
-
-GET http://localhost:9999/banners.getAll HTTP/1.1
-
-###
-
-GET http://localhost:9999/banners.save?id=0&title=depositi s doxodom 60/40 HTTP/1.1

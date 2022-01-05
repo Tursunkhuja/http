@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Tursunkhuja/http/pkg/banners"
 )
@@ -87,6 +88,7 @@ func (s *Server) handleGetBannerByID(writer http.ResponseWriter, request *http.R
 }
 
 // Save and update
+/*
 func (s *Server) handleSaveBanner(w http.ResponseWriter, r *http.Request) {
 	idParam := r.URL.Query().Get("id")
 	titleParam := r.URL.Query().Get("title")
@@ -129,6 +131,7 @@ func (s *Server) handleSaveBanner(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+*/
 
 // delete banner byID
 func (s *Server) handleremoveByID(writer http.ResponseWriter, request *http.Request) {
@@ -156,6 +159,64 @@ func (s *Server) handleremoveByID(writer http.ResponseWriter, request *http.Requ
 	}
 	writer.Header().Set("Contetn-Type", "applicatrion/json")
 	_, err = writer.Write(data)
+	if err != nil {
+		log.Print(err)
+	}
+}
+
+func (s *Server) handleSaveBanner(w http.ResponseWriter, r *http.Request) {
+	idp := r.PostFormValue("id")
+	title := r.PostFormValue("title")
+	content := r.PostFormValue("content")
+	button := r.PostFormValue("button")
+	link := r.PostFormValue("link")
+
+	id, err := strconv.ParseInt(idp, 10, 64)
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if title == "" && content == "" && button == "" && link == "" {
+
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	item := &banners.Banner{
+		ID:      id,
+		Title:   title,
+		Content: content,
+		Button:  button,
+		Link:    link,
+	}
+
+	file, header, err := r.FormFile("image")
+
+	if err == nil {
+		name := strings.Split(header.Filename, ".")
+		item.Image = name[len(name)-1]
+	}
+
+	banner, err := s.bannersSvc.Save(r.Context(), item, file)
+
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(banner)
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(data)
 	if err != nil {
 		log.Print(err)
 	}

@@ -3,19 +3,17 @@ package banners
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"sync"
 )
 
-//service to control banner
+// this is for managing banners
 type Service struct {
 	mu    sync.RWMutex
 	items []*Banner
-}
-
-//create service
-func NewService() *Service {
-	return &Service{items: make([]*Banner, 0)}
 }
 
 //Banner
@@ -25,6 +23,12 @@ type Banner struct {
 	Content string
 	Button  string
 	Link    string
+	Image   string
+}
+
+//create service
+func NewService() *Service {
+	return &Service{items: make([]*Banner, 0)}
 }
 
 func (s *Service) All(ctx context.Context) ([]*Banner, error) {
@@ -51,34 +55,55 @@ func (s *Service) ByID(ctx context.Context, id int64) (*Banner, error) {
 
 var newID int64
 
-func (s *Service) Save(ctx context.Context, item *Banner) (*Banner, error) {
+func (s *Service) Save(ctx context.Context, item *Banner, file multipart.File) (*Banner, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	if item.ID == 0 {
 		newID++
-		newBnner := &Banner{
-			ID:      newID,
-			Title:   item.Title,
-			Content: item.Content,
-			Button:  item.Button,
-			Link:    item.Link,
+		item.ID = newID
+		if item.Image != "" {
+			item.Image = fmt.Sprint(item.ID) + "." + item.Image
+
+			data, err := ioutil.ReadAll(file)
+			if err != nil {
+				return nil, errors.New("not readible data")
+			}
+
+			err = ioutil.WriteFile("./web/banners/"+item.Image, data, 0666)
+			if err != nil {
+				return nil, err
+			}
 		}
-		s.items = append(s.items, newBnner)
-		return newBnner, nil
+
+		s.items = append(s.items, item)
+		return item, nil
 	}
 
-	ExistB, err := s.ByID(ctx, item.ID)
+	for k, v := range s.items {
+		if v.ID == item.ID {
+			if item.Image != "" {
+				item.Image = fmt.Sprint(item.ID) + "." + item.Image
 
-	if err != nil {
-		log.Print(err)
-		return nil, errors.New("item not found")
+				data, err := ioutil.ReadAll(file)
+				if err != nil {
+					return nil, errors.New("not readible data")
+				}
+
+				err = ioutil.WriteFile("./web/banners/"+item.Image, data, 0666)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				item.Image = s.items[k].Image
+			}
+
+			s.items[k] = item
+			return item, nil
+		}
 	}
 
-	ExistB.Button = item.Button
-	ExistB.Title = item.Title
-	ExistB.Content = item.Content
-	ExistB.Link = item.Link
-
-	return ExistB, nil
+	return nil, errors.New("item not found")
 }
 
 func (s *Service) RemoveByID(ctx context.Context, id int64) (*Banner, error) {
